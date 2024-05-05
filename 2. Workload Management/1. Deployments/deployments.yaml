@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1 # maximum number or percentage of extra pods that can be created beyond the desired count
+      maxUnavailable: 0 # maximum number or percentage of pods that can be unavailable during the update process
+  revisionHistoryLimit: 10  # Specify the number of revisions to keep
+  minReadySeconds: 10  # Specify the minimum number of seconds for a newly created Pod to be considered ready
+  progressDeadlineSeconds: 600  # Specify the maximum number of seconds for the deployment to make progress
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+        - name: init-container
+          image: busybox
+          restartPolicy: Always
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          command: ['sh', '-c', 'printenv']
+      containers:
+        - name: backend
+          image: nodejs  # Assuming this is the correct image name
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: backend
+status:
+  currentHealthy: 2
+  desiredHealthy: 1
+  disruptionsAllowed: 1
+  expectedPods: 2
+  observedGeneration: 1
