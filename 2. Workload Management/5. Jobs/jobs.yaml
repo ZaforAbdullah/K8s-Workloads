@@ -1,0 +1,173 @@
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: pi
+# spec:
+#   # Without chosing any of the block below, this behave will be "Non-parallel Jobs"
+# 
+#   # Parallel Jobs block
+#   # completions: 5 # Add this line to specify the number of completions
+#   # completionMode: Indexed  # Add this line to specify the completion mode
+# 
+#   # Parallel Jobs with a work queue block
+#   # parallelism: 5  # Add this line to specify the parallelism
+# 
+#   template:
+#     spec:
+#       containers:
+#       - name: pi
+#         image: python:3.9
+#         command: ["python", "-c"]
+#         args: ["import math; print('{:.2000f}'.format(math.pi))"]
+#       restartPolicy: OnFailure # "Never" when debugging
+#   backoffLimit: 5 # default 6
+# ---
+# Indexed Job
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: pi
+# spec:
+#   completions: 5 # Add this line to specify the number of completions
+#   completionMode: Indexed  # Add this line to specify the completion mode
+#   template:
+#     spec:
+#       containers:
+#       - name: pi
+#         image: python:3.9
+#         command: ["python", "-c"]
+#         args: ["import math; print('{:.2000f}'.format(math.pi))"]
+#       restartPolicy: OnFailure
+#   backoffLimit: 5
+#   backoffLimitPerIndex: 2
+# ---
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: job-backoff-limit-per-index-example
+# spec:
+#   completions: 10
+#   parallelism: 3
+#   completionMode: Indexed  # required for the feature
+#   backoffLimitPerIndex: 1  # maximal number of failures per index
+#   maxFailedIndexes: 5      # maximal number of failed indexes before terminating the Job execution
+#   template:
+#     spec:
+#       restartPolicy: Never # required for the feature
+#       containers:
+#       - name: example
+#         image: python:3.9
+#         command:           # The jobs fails as there is at least one failed index
+#                            # (all even indexes fail in here), yet all indexes
+#                            # are executed as maxFailedIndexes is not exceeded.
+#         - python3
+#         - -c
+#         - |
+#           import os, sys
+#           print("Hello world")
+#           print(os.environ.get("JOB_COMPLETION_INDEX"))
+#           if int(os.environ.get("JOB_COMPLETION_INDEX")) % 2 == 0:
+#             sys.exit(1)
+# ---
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: job-pod-failure-policy-example
+# spec:
+#   completions: 12
+#   parallelism: 3
+#   template:
+#     spec:
+#       restartPolicy: Never
+#       containers:
+#       - name: main
+#         image: docker.io/library/bash:5
+#         command: ["bash"]        # example command simulating a bug which triggers the FailJob action
+#         args:
+#         - -c
+#         - echo "Hello world!" && sleep 5 && exit 42
+#   backoffLimit: 6
+#   podFailurePolicy:
+#     rules:
+#     - action: FailJob
+#       onExitCodes:
+#         containerName: main      # optional
+#         operator: In             # one of: In, NotIn
+#         values: [42]
+#     - action: Ignore             # one of: Ignore, FailJob, Count
+#       onPodConditions:
+#       - type: DisruptionTarget   # indicates Pod disruption
+# ---
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: example-job
+# spec:
+#   parallelism: 10
+#   completions: 10
+#   completionMode: Indexed # Required for the success policy
+#   successPolicy:
+#     rules:
+#       - succeededIndexes: 0,2-3
+#         succeededCount: 1
+#   template:
+#     spec:
+#       containers:
+#       - name: main
+#         image: python:3.9
+#         command:          # Provided that at least one of the Pods with 0, 2, and 3 indexes has succeeded,
+#                           # the overall Job is a success.
+#           - python3
+#           - -c
+#           - |
+#             import os, sys
+#             if os.environ.get("JOB_COMPLETION_INDEX") == "2":
+#               sys.exit(0)
+#             else:
+#               sys.exit(1)            
+# ---
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: pi
+# spec:
+#   backoffLimit: 5
+#   activeDeadlineSeconds: 100
+#   template:
+#     spec:
+#       containers:
+#       - name: pi
+#         image: python:3.9
+#         command: ["python", "-c"]
+#         args: ["import math; print('{:.2000f}'.format(math.pi))"]
+#       restartPolicy: Never
+# ---
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: pi-with-ttl
+# spec:
+#   ttlSecondsAfterFinished: 100
+#   template:
+#     spec:
+#       containers:
+#       - name: pi
+#         image: python:3.9
+#         command: ["python", "-c"]
+#         args: ["import math; print('{:.2000f}'.format(math.pi))"]
+#       restartPolicy: Never
+# ---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi
+spec:
+  suspend: true
+  template:
+    spec:
+      containers:
+      - name: pi
+        image: python:3.9
+        command: ["python", "-c"]
+        args: ["import math; print('{:.2000f}'.format(math.pi))"]
+      restartPolicy: OnFailure
